@@ -69,3 +69,4 @@ from .member import (
     ProjectMemberLiteAPISerializer,
 )
 from .sticky import StickySerializer
+from .view import IssueViewSerializer
