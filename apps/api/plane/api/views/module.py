@@ -30,6 +30,7 @@ from plane.app.permissions import ProjectEntityPermission
 from plane.bgtasks.issue_activities_task import issue_activity
 from plane.db.models import (
     Issue,
+    IssueComment,
     FileAsset,
     IssueLink,
     Module,
@@ -681,6 +682,12 @@ class ModuleIssueListCreateAPIEndpoint(BaseAPIView):
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
             )
+            .annotate(
+                comment_count=IssueComment.objects.filter(issue=OuterRef("id"))
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
         )
         return self.paginate(
             request=request,
@@ -887,6 +894,12 @@ class ModuleIssueDetailAPIEndpoint(BaseAPIView):
                     issue_id=OuterRef("id"),
                     entity_type=FileAsset.EntityTypeContext.ISSUE_ATTACHMENT,
                 )
+                .order_by()
+                .annotate(count=Func(F("id"), function="Count"))
+                .values("count")
+            )
+            .annotate(
+                comment_count=IssueComment.objects.filter(issue=OuterRef("id"))
                 .order_by()
                 .annotate(count=Func(F("id"), function="Count"))
                 .values("count")
