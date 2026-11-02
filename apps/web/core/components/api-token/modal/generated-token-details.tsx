@@ -4,6 +4,7 @@
  * See the LICENSE file for details.
  */
 
+import { observer } from "mobx-react";
 import { useTranslation } from "@plane/i18n";
 import { Button } from "@plane/propel/button";
 import { CopyIcon } from "@plane/propel/icons";
@@ -14,6 +15,7 @@ import type { IApiToken } from "@plane/types";
 import { renderFormattedDate, renderFormattedTime, copyTextToClipboard } from "@plane/utils";
 // helpers
 // types
+import { useUser } from "@/hooks/store/user";
 import { usePlatformOS } from "@/hooks/use-platform-os";
 // hooks
 
@@ -22,7 +24,8 @@ type Props = {
   tokenDetails: IApiToken;
 };
 
-export function GeneratedTokenDetails(props: Props) {
+export const GeneratedTokenDetails = observer(function GeneratedTokenDetails(props: Props) {
+  const { data: user } = useUser();
   const { handleClose, tokenDetails } = props;
   const { isMobile } = usePlatformOS();
   const { t } = useTranslation();
@@ -55,7 +58,7 @@ export function GeneratedTokenDetails(props: Props) {
       <div className="mt-6 flex items-center justify-between">
         <p className="text-11 text-placeholder">
           {tokenDetails.expired_at
-            ? `Expires ${renderFormattedDate(tokenDetails.expired_at)} at ${renderFormattedTime(tokenDetails.expired_at)}`
+            ? `Expires ${renderFormattedDate(tokenDetails.expired_at, undefined, user?.user_timezone)} at ${renderFormattedTime(tokenDetails.expired_at, "24-hour", user?.user_timezone)}`
             : "Never expires"}
         </p>
         <Button variant="secondary" onClick={handleClose}>

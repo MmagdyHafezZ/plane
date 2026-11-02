@@ -5,6 +5,7 @@
  */
 
 import { useState } from "react";
+import { observer } from "mobx-react";
 import { mutate } from "swr";
 // plane imports
 import { TOAST_TYPE, setToast } from "@plane/propel/toast";
@@ -14,6 +15,8 @@ import { EModalPosition, EModalWidth, ModalCore } from "@plane/ui";
 import { renderFormattedDate, csvDownload } from "@plane/utils";
 // constants
 import { API_TOKENS_LIST } from "@plane/constants";
+// hooks
+import { useUser } from "@/hooks/store/user";
 // local imports
 import { CreateApiTokenForm } from "./form";
 import { GeneratedTokenDetails } from "./generated-token-details";
@@ -26,7 +29,8 @@ type Props = {
 // services
 const apiTokenService = new APITokenService();
 
-export function CreateApiTokenModal(props: Props) {
+export const CreateApiTokenModal = observer(function CreateApiTokenModal(props: Props) {
+  const { data: user } = useUser();
   const { isOpen, onClose } = props;
   // states
   const [neverExpires, setNeverExpires] = useState<boolean>(false);
@@ -45,7 +49,9 @@ export function CreateApiTokenModal(props: Props) {
     const csvData = {
       Title: data.label,
       Description: data.description,
-      Expiry: data.expired_at ? (renderFormattedDate(data.expired_at)?.replace(",", " ") ?? "") : "Never expires",
+      Expiry: data.expired_at
+        ? (renderFormattedDate(data.expired_at, undefined, user?.user_timezone)?.replace(",", " ") ?? "")
+        : "Never expires",
       "Secret key": data.token ?? "",
     };
 
