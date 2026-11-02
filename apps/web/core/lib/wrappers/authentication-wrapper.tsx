@@ -56,26 +56,25 @@ export const AuthenticationWrapper = observer(function AuthenticationWrapper(pro
     false;
 
   const getWorkspaceRedirectionUrl = (): string => {
-    let redirectionRoute = "/create-workspace";
-
     // validating the nextPath from the router query
-    if (nextPath && isValidURL(nextPath.toString())) {
-      redirectionRoute = nextPath.toString();
-      return redirectionRoute;
+    if (nextPath && isValidURL(nextPath.toString()) && nextPath.toString() !== "/") {
+      return nextPath.toString();
     }
 
     // validate the last and fallback workspace_slug
     const currentWorkspaceSlug =
       currentUserSettings?.workspace?.last_workspace_slug || currentUserSettings?.workspace?.fallback_workspace_slug;
 
-    // validate the current workspace_slug is available in the user's workspace list
-    const isCurrentWorkspaceValid = Object.values(workspaces || {}).findIndex(
-      (workspace) => workspace.slug === currentWorkspaceSlug
-    );
+    if (currentWorkspaceSlug) {
+      return `/${currentWorkspaceSlug}`;
+    }
 
-    if (isCurrentWorkspaceValid >= 0) redirectionRoute = `/${currentWorkspaceSlug}`;
+    const availableWorkspaces = Object.values(workspaces || {});
+    if (availableWorkspaces.length > 0 && availableWorkspaces[0]?.slug) {
+      return `/${availableWorkspaces[0].slug}`;
+    }
 
-    return redirectionRoute;
+    return "/tickets";
   };
 
   if ((isUserSWRLoading || isUserLoading || workspacesLoader) && !currentUser?.id)

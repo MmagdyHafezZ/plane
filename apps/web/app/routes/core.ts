@@ -386,6 +386,10 @@ export const coreRoutes: RouteConfigEntry[] = [
   // → /:workspaceSlug/projects/:projectId/intake
   route(":workspaceSlug/projects/:projectId/inbox", "routes/redirects/core/inbox.tsx"),
 
+  // Browse fallback redirects without workspaceSlug prefix
+  route("browse/:workItem", "routes/redirects/core/browse.tsx"),
+  route("browse", "routes/redirects/core/browse.tsx"),
+
   // Sign-up redirects
   route("accounts/sign-up", "routes/redirects/core/accounts-signup.tsx"),
 

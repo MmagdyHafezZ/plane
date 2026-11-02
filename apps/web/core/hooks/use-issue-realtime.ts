@@ -15,88 +15,154 @@ import { useUser } from "@/hooks/store/user";
 // Debounce window to coalesce bursts of issue events into a single refresh
 const ISSUE_EVENT_DEBOUNCE_MS = 500;
 
-type TIssueRealtimePayload = {
-  event: string;
-  data: {
-    project_id: string;
-    issue_id: string | null;
-    type: string | null;
-    actor_id: string | null;
-  };
+export type TIssueRealtimeEventData = {
+  project_id: string;
+  issue_id: string | null;
+  type: string | null;
+  actor_id: string | null;
 };
 
-/**
- * Subscribes to realtime issue change events for a project over the live server
- * and invokes `onIssueEvent` (debounced) whenever another actor changes an issue.
- * @param projectId - The project to subscribe to
- * @param onIssueEvent - Callback invoked (debounced) on remote issue changes
- */
-export const useIssueRealtime = (projectId: string | undefined, onIssueEvent: () => void) => {
-  const { workspaceSlug: routerWorkspaceSlug } = useParams();
-  const workspaceSlug = routerWorkspaceSlug ? routerWorkspaceSlug.toString() : undefined;
-  const { data: currentUser } = useUser();
+type TIssueRealtimePayload = {
+  event: string;
+  data: TIssueRealtimeEventData;
+};
 
-  // Keep the latest callback and user id in refs so the provider is not
-  // re-created when they change
-  const onIssueEventRef = useRef(onIssueEvent);
-  onIssueEventRef.current = onIssueEvent;
-  const currentUserIdRef = useRef(currentUser?.id);
-  currentUserIdRef.current = currentUser?.id;
+type TProjectSubscription = {
+  provider: HocuspocusProvider;
+  listeners: Set<(data: TIssueRealtimeEventData) => void>;
+  destroyTimeout: ReturnType<typeof setTimeout> | null;
+};
 
-  useEffect(() => {
-    if (typeof window === "undefined" || !projectId || !currentUser?.id) return;
+// Module-level cache so multiple components watching the same project share one WebSocket connection
+const subscriptions = new Map<string, TProjectSubscription>();
 
-    // Construct the WebSocket collaboration URL, mirroring the page editor
-    let wsLiveUrl: URL;
-    try {
-      const liveServerBaseUrl = LIVE_BASE_URL?.trim() || window.location.origin;
-      wsLiveUrl = new URL(liveServerBaseUrl);
-      const isSecureEnvironment = window.location.protocol === "https:";
-      wsLiveUrl.protocol = isSecureEnvironment ? "wss" : "ws";
-      wsLiveUrl.pathname = `${LIVE_BASE_PATH}/collaboration`;
-      if (workspaceSlug) wsLiveUrl.searchParams.set("workspaceSlug", workspaceSlug);
-      wsLiveUrl.searchParams.set("projectId", projectId);
-      wsLiveUrl.searchParams.set("documentType", "project_page");
-    } catch (error) {
-      console.error("Error creating issue realtime config", error);
-      return;
+const getOrCreateSubscription = (
+  projectId: string,
+  workspaceSlug: string | undefined,
+  currentUser: { id: string; display_name?: string | null }
+): TProjectSubscription | null => {
+  let sub = subscriptions.get(projectId);
+  if (sub) {
+    if (sub.destroyTimeout) {
+      clearTimeout(sub.destroyTimeout);
+      sub.destroyTimeout = null;
     }
+    return sub;
+  }
 
-    const provider = new HocuspocusProvider({
+  let wsLiveUrl: URL;
+  try {
+    const liveServerBaseUrl = LIVE_BASE_URL?.trim() || window.location.origin;
+    wsLiveUrl = new URL(liveServerBaseUrl);
+    const isSecureEnvironment = window.location.protocol === "https:";
+    wsLiveUrl.protocol = isSecureEnvironment ? "wss" : "ws";
+    wsLiveUrl.pathname = `${LIVE_BASE_PATH}/collaboration`;
+    if (workspaceSlug) wsLiveUrl.searchParams.set("workspaceSlug", workspaceSlug);
+    wsLiveUrl.searchParams.set("projectId", projectId);
+    wsLiveUrl.searchParams.set("documentType", "project_page");
+  } catch (error) {
+    console.error("Error creating issue realtime config", error);
+    return null;
+  }
+
+  const listeners = new Set<(data: TIssueRealtimeEventData) => void>();
+
+  let provider: HocuspocusProvider;
+  try {
+    provider = new HocuspocusProvider({
       name: `issue-events:${projectId}`,
       token: JSON.stringify({ id: currentUser.id, name: currentUser.display_name ?? "" }),
       url: wsLiveUrl.toString(),
     });
+  } catch (error) {
+    console.error("Error initializing HocuspocusProvider for issue realtime", error);
+    return null;
+  }
+
+  const handleStateless = ({ payload }: { payload: string }) => {
+    try {
+      const parsedPayload = JSON.parse(payload) as TIssueRealtimePayload;
+      if (parsedPayload.event !== "issue_changed") return;
+      listeners.forEach((listener) => {
+        try {
+          listener(parsedPayload.data);
+        } catch (err) {
+          console.error("Error in realtime listener callback", err);
+        }
+      });
+    } catch (error) {
+      console.error("Error handling issue realtime event", error);
+    }
+  };
+
+  provider.on("stateless", handleStateless);
+
+  sub = {
+    provider,
+    listeners,
+    destroyTimeout: null,
+  };
+
+  subscriptions.set(projectId, sub);
+  return sub;
+};
+
+/**
+ * Subscribes to realtime issue change events for a project over the live server
+ * and invokes `onIssueEvent` (debounced) whenever an issue is created or updated.
+ *
+ * Supports multi-device / multi-tab syncing by dispatching all remote change events.
+ * Multiple subscribers in the same project share a single WebSocket connection.
+ *
+ * @param projectId - The project to subscribe to
+ * @param onIssueEvent - Callback invoked (debounced) on issue changes, with event data
+ */
+export const useIssueRealtime = (
+  projectId: string | undefined,
+  onIssueEvent: (data: TIssueRealtimeEventData) => void
+) => {
+  const { workspaceSlug: routerWorkspaceSlug } = useParams();
+  const workspaceSlug = routerWorkspaceSlug ? routerWorkspaceSlug.toString() : undefined;
+  const { data: currentUser } = useUser();
+
+  const onIssueEventRef = useRef(onIssueEvent);
+  onIssueEventRef.current = onIssueEvent;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !projectId || !currentUser?.id) return;
+
+    const sub = getOrCreateSubscription(projectId, workspaceSlug, currentUser);
+    if (!sub) return;
 
     let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-    const handleStateless = ({ payload }: { payload: string }) => {
-      try {
-        const parsedPayload = JSON.parse(payload) as TIssueRealtimePayload;
-        if (parsedPayload.event !== "issue_changed") return;
-        // ignore events triggered by the current user
-        if (parsedPayload.data?.actor_id && parsedPayload.data.actor_id === currentUserIdRef.current) return;
-
-        if (debounceTimer) clearTimeout(debounceTimer);
-        debounceTimer = setTimeout(() => {
-          debounceTimer = null;
-          onIssueEventRef.current();
-        }, ISSUE_EVENT_DEBOUNCE_MS);
-      } catch (error) {
-        console.error("Error handling issue realtime event", error);
-      }
+    const listener = (data: TIssueRealtimeEventData) => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        debounceTimer = null;
+        onIssueEventRef.current(data);
+      }, ISSUE_EVENT_DEBOUNCE_MS);
     };
 
-    provider.on("stateless", handleStateless);
+    sub.listeners.add(listener);
 
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
-      provider.off("stateless", handleStateless);
-      try {
-        provider.destroy();
-      } catch (error) {
-        console.error("Error destroying issue realtime provider:", error);
+      sub.listeners.delete(listener);
+
+      // If no more listeners for this project, schedule a cleanup.
+      // Small timeout avoids thrashing connections on page transitions or Fast Refresh.
+      if (sub.listeners.size === 0) {
+        if (sub.destroyTimeout) clearTimeout(sub.destroyTimeout);
+        sub.destroyTimeout = setTimeout(() => {
+          try {
+            sub.provider.destroy();
+          } catch (err) {
+            console.error("Error destroying issue realtime provider:", err);
+          }
+          subscriptions.delete(projectId);
+        }, 1500);
       }
     };
-  }, [projectId, workspaceSlug, currentUser?.id, currentUser?.display_name]);
+  }, [projectId, workspaceSlug, currentUser]);
 };

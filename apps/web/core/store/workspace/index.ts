@@ -127,19 +127,21 @@ export class BaseWorkspaceRootStore implements IWorkspaceRootStore {
    * get the workspace redirection url based on the last and fallback workspace_slug
    */
   getWorkspaceRedirectionUrl = () => {
-    let redirectionRoute = "/create-workspace";
     // validate the last and fallback workspace_slug
     const currentWorkspaceSlug =
       this.user.userSettings?.data?.workspace?.last_workspace_slug ||
       this.user.userSettings?.data?.workspace?.fallback_workspace_slug;
 
-    // validate the current workspace_slug is available in the user's workspace list
-    const isCurrentWorkspaceValid = Object.values(this.workspaces || {}).findIndex(
-      (workspace) => workspace.slug === currentWorkspaceSlug
-    );
+    if (currentWorkspaceSlug) {
+      return `/${currentWorkspaceSlug}`;
+    }
 
-    if (isCurrentWorkspaceValid >= 0) redirectionRoute = `/${currentWorkspaceSlug}`;
-    return redirectionRoute;
+    const availableWorkspaces = Object.values(this.workspaces || {});
+    if (availableWorkspaces.length > 0 && availableWorkspaces[0]?.slug) {
+      return `/${availableWorkspaces[0].slug}`;
+    }
+
+    return "/tickets";
   };
 
   /**

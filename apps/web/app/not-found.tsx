@@ -32,13 +32,22 @@ function PageNotFound() {
               temporarily unavailable.
             </p>
           </div>
-          <Link href="/">
-            <span className="flex justify-center">
-              <Button variant="secondary" size="lg">
-                Go to Home
-              </Button>
-            </span>
-          </Link>
+          <div className="flex items-center justify-center gap-3">
+            <Link href="/tickets">
+              <span>
+                <Button variant="primary" size="lg">
+                  Go to Workspace
+                </Button>
+              </span>
+            </Link>
+            <Link href="/">
+              <span>
+                <Button variant="secondary" size="lg">
+                  Go to Home
+                </Button>
+              </span>
+            </Link>
+          </div>
         </div>
       </div>
     </div>

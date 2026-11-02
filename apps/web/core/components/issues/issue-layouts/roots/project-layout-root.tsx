@@ -54,10 +54,10 @@ export const ProjectLayoutRoot = observer(function ProjectLayoutRoot() {
   const workItemFilters = projectId ? issuesFilter?.getIssueFilters(projectId) : undefined;
   const activeLayout = workItemFilters?.displayFilters?.layout;
 
-  // soft refresh the current issues when another actor changes them
+  // soft refresh the current issues when an issue changes
   useIssueRealtime(projectId, () => {
     if (workspaceSlug && projectId) {
-      issues?.fetchIssuesWithExistingPagination(workspaceSlug, projectId, undefined);
+      issues?.fetchIssuesWithExistingPagination(workspaceSlug, projectId, "loaded");
     }
   });
 

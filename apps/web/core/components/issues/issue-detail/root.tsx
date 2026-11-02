@@ -23,6 +23,7 @@ import { useIssueDetail } from "@/hooks/store/use-issue-detail";
 import { useIssues } from "@/hooks/store/use-issues";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useAppRouter } from "@/hooks/use-app-router";
+import { useIssueRealtime } from "@/hooks/use-issue-realtime";
 // local components
 import { IssuePeekOverview } from "../peek-overview";
 import { IssueMainContent } from "./main-content";
@@ -220,6 +221,15 @@ export const IssueDetailRoot = observer(function IssueDetailRoot(props: TIssueDe
 
   // route ids are read after issueOperations, whose callbacks take their own ids
   const { workspaceSlug, projectId, issueId } = props;
+
+  // refresh issue details in realtime when this issue is modified remotely
+  useIssueRealtime(projectId, (data) => {
+    if (workspaceSlug && projectId && issueId) {
+      if (!data?.issue_id || data.issue_id === issueId) {
+        issueOperations.fetch(workspaceSlug, projectId, issueId);
+      }
+    }
+  });
   // issue details
   const issue = getIssueById(issueId);
   // checking if issue is editable, based on user role

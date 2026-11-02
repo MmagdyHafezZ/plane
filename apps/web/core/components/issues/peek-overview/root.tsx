@@ -22,6 +22,7 @@ import { useIssues } from "@/hooks/store/use-issues";
 import { useUserPermissions } from "@/hooks/store/user";
 import { useIssueStoreType } from "@/hooks/use-issue-layout-store";
 import { useWorkItemProperties } from "@/hooks/use-issue-properties";
+import { useIssueRealtime } from "@/hooks/use-issue-realtime";
 // local imports
 import type { TIssueOperations } from "../issue-detail";
 import { IssueView } from "./view";
@@ -218,6 +219,15 @@ export const IssuePeekOverview = observer(function IssuePeekOverview(props: IWor
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [fetchIssue, is_draft, issues, fetchActivities, pathname, removeRoutePeekId, restoreIssue]
   );
+
+  // refresh peek issue in realtime when modified remotely
+  useIssueRealtime(peekIssue?.projectId, (data) => {
+    if (peekIssue?.workspaceSlug && peekIssue?.projectId && peekIssue?.issueId) {
+      if (!data?.issue_id || data.issue_id === peekIssue.issueId) {
+        issueOperations.fetch(peekIssue.workspaceSlug, peekIssue.projectId, peekIssue.issueId);
+      }
+    }
+  });
 
   const { isLoading } = useSWR(
     ["peek-issue", peekIssue?.workspaceSlug, peekIssue?.projectId, peekIssue?.issueId],
