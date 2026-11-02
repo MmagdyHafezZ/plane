@@ -101,4 +101,4 @@ export const CreateApiTokenModal = observer(function CreateApiTokenModal(props: 
       )}
     </ModalCore>
   );
-}
+});

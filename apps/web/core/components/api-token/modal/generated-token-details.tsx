@@ -67,4 +67,4 @@ export const GeneratedTokenDetails = observer(function GeneratedTokenDetails(pro
       </div>
     </div>
   );
-}
+});

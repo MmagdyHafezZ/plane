@@ -354,7 +354,6 @@ export const DescriptionInput = observer(function DescriptionInput(props: Props)
                 project_id: projectId,
               })
             }
-            }
             containerClassName={containerClassName}
             uploadFile={async (blockId, file) => {
               try {
