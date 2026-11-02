@@ -1,0 +1,60 @@
+name: Build and Publish Realtime Plane Images
+
+on:
+  push:
+    branches:
+      - feat/realtime-issue-events
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - service: backend
+            context: ./apps/api
+            dockerfile: ./apps/api/Dockerfile.api
+            image: plane-backend
+          - service: live
+            context: .
+            dockerfile: ./apps/live/Dockerfile.live
+            image: plane-live
+          - service: frontend
+            context: .
+            dockerfile: ./apps/web/Dockerfile.web
+            image: plane-frontend
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Downcase repository owner
+        id: repo_owner
+        run: echo "OWNER=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          tags: |
+            ghcr.io/${{ steps.repo_owner.outputs.OWNER }}/${{ matrix.image }}:realtime
+            ghcr.io/${{ steps.repo_owner.outputs.OWNER }}/${{ matrix.image }}:v1.4.2-realtime
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
