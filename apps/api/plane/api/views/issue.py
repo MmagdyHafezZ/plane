@@ -270,7 +270,6 @@ class WorkspaceIssueAPIEndpoint(BaseAPIView):
                     .annotate(count=Func(F("id"), function="Count"))
                     .values("count")
                 )
-            )
             ).get(
                 workspace__slug=slug,
                 project__identifier=project_identifier,
